@@ -1,16 +1,17 @@
 # TLDR_linebot
 
-LINE 群組聊天摘要機器人。在群組輸入 `/tldr` 就會摘要最近的對話。
+LINE 群組聊天摘要機器人。在群組輸入 `tldr` 就會摘要最近的對話（`/tldr` 也可以）。
 
 ## 使用方式
 
 | 指令 | 說明 |
 | --- | --- |
-| `/tldr` | 摘要最近 12 小時 |
-| `/tldr 3h` | 摘要最近 3 小時 |
-| `/tldr 2d` | 摘要最近 2 天（最多 7 天） |
+| `tldr` | 摘要最近 12 小時 |
+| `tldr 3h` | 摘要最近 3 小時 |
+| `tldr 2d` | 摘要最近 2 天（最多 7 天） |
 
 - 只在群組／多人聊天室運作；同一群組 1 分鐘內只能觸發一次。
+- 訊息必須只有 `tldr` 或 `tldr 3h` 這種格式才會觸發；`tldr 我覺得太長` 之類的一般對話不會。
 - 機器人只看得到「加入群組之後」的訊息。
 - 訊息保留 7 天後自動刪除；把機器人移出群組會立即刪除該群組的所有紀錄。
 - 貼圖、圖片等非文字訊息只記錄為「[貼圖]」「[圖片]」等佔位文字。
@@ -20,14 +21,14 @@ LINE 群組聊天摘要機器人。在群組輸入 `/tldr` 就會摘要最近的
 ```
 LINE ──HTTPS──▶ Caddy (DuckDNS + Let's Encrypt) ──▶ FastAPI app ──▶ SQLite
                                                         │
-                                                        └──▶ LLM（Gemini，失敗時改用 NVIDIA）
+                                                        └──▶ LLM（Gemini Flash，失敗時改用 Flash-Lite）
 ```
 
 | 檔案 | 用途 |
 | --- | --- |
 | `src/tldr_linebot/app.py` | webhook 伺服器、LINE SDK 轉接、定時清除 |
 | `src/tldr_linebot/bot.py` | 機器人行為（儲存、指令、冷卻、摘要），不依賴 LINE SDK |
-| `src/tldr_linebot/command.py` | `/tldr` 指令解析 |
+| `src/tldr_linebot/command.py` | `tldr` 指令解析 |
 | `src/tldr_linebot/store.py` | SQLite 存取 |
 | `src/tldr_linebot/prompt.py` | 摘要 prompt 與聊天紀錄格式化 |
 | `src/tldr_linebot/llm.py` | OpenAI 相容 API 呼叫與供應商備援 |
@@ -56,7 +57,7 @@ push 到 `main` 且 CI 通過後，GitHub Actions 會 build 映像推到 `ghcr.i
 ### 2. LLM API 金鑰
 
 - 主要：[Google AI Studio](https://aistudio.google.com/apikey) 取得 Gemini API key。免費方案的內容會被 Google 用於改進產品。
-- 備援（選用）：[build.nvidia.com](https://build.nvidia.com) 取得 API key。
+- 備援：預設用同一把金鑰的 Gemini Flash-Lite（Flash 忙碌回 503 時接手）；也可改用 [build.nvidia.com](https://build.nvidia.com) 的模型。
 - 模型 ID 會隨時間變動，請到各自網站確認後填入 `.env`。
 
 ### 3. DuckDNS

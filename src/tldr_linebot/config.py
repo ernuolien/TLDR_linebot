@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     llm_model: str = "gemini-flash-latest"
 
     # Fallback LLM, used when the primary fails; leave key empty to disable
-    llm_fallback_base_url: str = "https://integrate.api.nvidia.com/v1"
+    llm_fallback_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     llm_fallback_api_key: str = ""
-    llm_fallback_model: str = "qwen/qwen3.5-397b-a17b"
+    llm_fallback_model: str = "gemini-flash-lite-latest"
 
     db_path: str = "data/tldr.db"
     timezone: str = "Asia/Taipei"

@@ -117,7 +117,7 @@ async def test_tldr_summarizes_only_window(env):
 async def test_tldr_custom_window(env):
     bot, _, _, summarizer, _ = env
     await bot.on_message(msg("兩天前", ts_ms=int(NOW * 1000) - 47 * HOUR_MS))
-    await bot.on_message(msg("/tldr 2d"))
+    await bot.on_message(msg("tldr 2d"))
     assert "兩天前" in summarizer.prompts[0]
 
 
@@ -130,7 +130,7 @@ async def test_tldr_with_no_messages(env):
 
 async def test_invalid_command_replies_usage(env):
     bot, _, messenger, _, _ = env
-    await bot.on_message(msg("/tldr 9d"))
+    await bot.on_message(msg("tldr 9d"))
     assert "用法" in messenger.replies[0][1]
 
 
