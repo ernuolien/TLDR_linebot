@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     timezone: str = "Asia/Taipei"
 
     retention_days: int = 7
-    default_window_hours: int = 12
+    default_window_hours: int = 3
     cooldown_seconds: int = 60
     max_messages: int = 2000
     max_input_chars: int = 60_000

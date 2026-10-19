@@ -20,7 +20,7 @@ class FakeMessenger:
     def __init__(self):
         self.replies: list[tuple[str, str]] = []
         self.name_lookups = 0
-        self.names = {"u1": "小明", "u2": "小華"}
+        self.names = {"u1": "小明", "u2": "小華", "u3": "阿明", "u4": "小明明"}
 
     async def reply(self, reply_token, text):
         self.replies.append((reply_token, text))
@@ -60,7 +60,9 @@ def env(settings):
     return bot, store, messenger, summarizer, clock
 
 
-def msg(text, *, chat="g1", user="u1", ts_ms=int(NOW * 1000), is_text=True, token="rt"):
+def msg(
+    text, *, chat="g1", user="u1", ts_ms=int(NOW * 1000), is_text=True, token="rt", mentions=()
+):
     return IncomingMessage(
         chat_id=chat,
         is_room=False,
@@ -69,6 +71,7 @@ def msg(text, *, chat="g1", user="u1", ts_ms=int(NOW * 1000), is_text=True, toke
         is_text=is_text,
         ts_ms=ts_ms,
         reply_token=token,
+        mentions=mentions,
     )
 
 
@@ -104,7 +107,7 @@ async def test_command_not_stored(env):
 async def test_tldr_summarizes_only_window(env):
     bot, _, messenger, summarizer, _ = env
     now_ms = int(NOW * 1000)
-    await bot.on_message(msg("太舊了", ts_ms=now_ms - 13 * HOUR_MS))
+    await bot.on_message(msg("太舊了", ts_ms=now_ms - 4 * HOUR_MS))
     await bot.on_message(msg("晚餐吃什麼", ts_ms=now_ms - 1 * HOUR_MS))
 
     await bot.on_message(msg("/tldr", token="t1"))
@@ -198,3 +201,84 @@ async def test_purge_expired(env):
     await bot.on_message(msg("new", ts_ms=now_ms - HOUR_MS))
     assert bot.purge_expired() == 1
     assert [m.text for m in store.since("g1", 0, 10)[0]] == ["new"]
+
+
+async def _chat(bot):
+    now_ms = int(NOW * 1000)
+    await bot.on_message(msg("週五要不要聚餐", user="u1", ts_ms=now_ms - 30 * 60_000))
+    await bot.on_message(msg("好啊我可以訂位", user="u2", ts_ms=now_ms - 20 * 60_000))
+    await bot.on_message(msg("那我負責找地點", user="u1", ts_ms=now_ms - 10 * 60_000))
+
+
+async def test_person_summary_by_name(env):
+    bot, _, messenger, summarizer, _ = env
+    await _chat(bot)
+    await bot.on_message(msg("tldr 小明", user="u2"))
+
+    reply = messenger.replies[0][1]
+    assert reply.startswith("小明（最近 3 小時，2 則）\n")
+    prompt = summarizer.prompts[0]
+    assert prompt.startswith("目標成員：小明")
+    assert "▶[" in prompt and "小明: 週五要不要聚餐" in prompt
+    assert "▶[01/01 07:40] 小華" not in prompt  # other people stay as context, unmarked
+    assert "小華: 好啊我可以訂位" in prompt
+
+
+async def test_person_partial_name_and_duration_first(env):
+    bot, _, messenger, _, _ = env
+    await _chat(bot)
+    await bot.on_message(msg("tldr 6h 華"))
+    assert messenger.replies[0][1].startswith("小華（最近 6 小時，1 則）")
+
+
+async def test_exact_name_beats_partial(env):
+    bot, _, messenger, _, _ = env
+    await _chat(bot)
+    await bot.on_message(msg("嗨", user="u4"))  # 小明明
+    await bot.on_message(msg("tldr 小明"))
+    assert messenger.replies[0][1].startswith("小明（")
+
+
+async def test_ambiguous_name(env):
+    bot, _, messenger, summarizer, _ = env
+    await _chat(bot)
+    await bot.on_message(msg("tldr 小"))
+    assert messenger.replies[0][1].startswith("找到多位：小明、小華")
+    assert summarizer.prompts == []
+
+
+async def test_unknown_name_is_ordinary_chat(env):
+    bot, store, messenger, summarizer, _ = env
+    await _chat(bot)
+    await bot.on_message(msg("tldr 我覺得太長"))
+    assert messenger.replies == []
+    assert summarizer.prompts == []
+    assert store.since("g1", 0, 10)[0][-1].text == "tldr 我覺得太長"
+    # and it did not use up the cooldown
+    await bot.on_message(msg("tldr"))
+    assert messenger.replies == [("rt", "摘要結果")]
+
+
+async def test_person_by_mention(env):
+    bot, _, messenger, _, _ = env
+    await _chat(bot)
+    await bot.on_message(msg("tldr @隨便打的名字", mentions=("u2",)))
+    assert messenger.replies[0][1].startswith("小華（最近 3 小時，1 則）")
+
+
+async def test_mention_of_someone_who_did_not_speak(env):
+    bot, _, messenger, summarizer, _ = env
+    await _chat(bot)
+    await bot.on_message(msg("tldr @阿明", mentions=("u3",)))
+    assert messenger.replies == [("rt", "最近 3 小時內沒有 阿明 的發言。")]
+    assert summarizer.prompts == []
+
+
+async def test_person_outside_window_is_unknown(env):
+    bot, _, messenger, _, _ = env
+    await bot.on_message(msg("很久以前", user="u2", ts_ms=int(NOW * 1000) - 5 * HOUR_MS))
+    await bot.on_message(msg("最近", user="u1"))
+    await bot.on_message(msg("tldr 小華"))
+    assert messenger.replies == []  # 小華 hasn't spoken in the last 3 hours
+    await bot.on_message(msg("tldr 小華 6h", token="t2"))
+    assert messenger.replies[0][1].startswith("小華（最近 6 小時，1 則）")

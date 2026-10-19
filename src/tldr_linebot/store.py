@@ -21,6 +21,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_ts ON messages (ts_ms);
 
 @dataclass(frozen=True)
 class StoredMessage:
+    user_id: str
     name: str
     text: str
     ts_ms: int
@@ -53,11 +54,20 @@ class Store:
             (chat_id, since_ms),
         ).fetchone()[0]
         rows = self._conn.execute(
-            "SELECT name, text, ts_ms FROM messages WHERE chat_id = ? AND ts_ms >= ?"
+            "SELECT user_id, name, text, ts_ms FROM messages WHERE chat_id = ? AND ts_ms >= ?"
             " ORDER BY ts_ms DESC, id DESC LIMIT ?",
             (chat_id, since_ms, limit),
         ).fetchall()
         return [StoredMessage(*row) for row in reversed(rows)], total
+
+    def speakers(self, chat_id: str, since_ms: int) -> dict[str, str]:
+        """Map user_id to their most recent display name, for everyone who spoke since `since_ms`."""
+        rows = self._conn.execute(
+            "SELECT user_id, name FROM messages WHERE chat_id = ? AND ts_ms >= ? AND user_id != ''"
+            " ORDER BY ts_ms, id",
+            (chat_id, since_ms),
+        ).fetchall()
+        return dict(rows)
 
     def delete_older_than(self, cutoff_ms: int) -> int:
         with self._conn:

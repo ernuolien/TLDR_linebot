@@ -85,3 +85,27 @@ def test_to_incoming_maps_text_and_placeholders(settings):
         reply_token="rt",
     )
     assert app_module.to_incoming(events[1]).text == "[貼圖]"
+
+
+def test_to_incoming_extracts_user_mentions_but_not_the_bot():
+    from linebot.v3.webhook import WebhookParser
+
+    parser = WebhookParser("secret")
+    text = message_event(
+        {
+            "type": "text",
+            "id": "1",
+            "quoteToken": "q",
+            "text": "@Bot tldr @小華 @All",
+            "mention": {
+                "mentionees": [
+                    {"type": "user", "index": 0, "length": 4, "userId": "bot", "isSelf": True},
+                    {"type": "user", "index": 10, "length": 3, "userId": "u2", "isSelf": False},
+                    {"type": "all", "index": 14, "length": 4},
+                ]
+            },
+        }
+    )
+    body = json.dumps({"destination": "x", "events": [text]})
+    events = parser.parse(body, sign(body))
+    assert app_module.to_incoming(events[0]).mentions == ("u2",)

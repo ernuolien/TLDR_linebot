@@ -29,6 +29,7 @@ from linebot.v3.webhooks import (
     RoomSource,
     StickerMessageContent,
     TextMessageContent,
+    UserMentionee,
     VideoMessageContent,
 )
 
@@ -82,6 +83,13 @@ def to_incoming(event: MessageEvent) -> IncomingMessage:
     content = event.message
     is_text = isinstance(content, TextMessageContent)
     text = content.text if is_text else _PLACEHOLDERS.get(type(content), "[其他訊息]")
+    mentions: tuple[str, ...] = ()
+    if is_text and content.mention:
+        mentions = tuple(
+            m.user_id
+            for m in content.mention.mentionees
+            if isinstance(m, UserMentionee) and m.user_id and not m.is_self
+        )
     return IncomingMessage(
         chat_id=chat_id,
         is_room=is_room,
@@ -90,6 +98,7 @@ def to_incoming(event: MessageEvent) -> IncomingMessage:
         is_text=is_text,
         ts_ms=event.timestamp,
         reply_token=event.reply_token,
+        mentions=mentions,
     )
 
 
