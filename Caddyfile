@@ -1,0 +1,11 @@
+{$DOMAIN} {
+	handle /callback {
+		reverse_proxy app:8000
+	}
+	handle /healthz {
+		reverse_proxy app:8000
+	}
+	handle {
+		respond 404
+	}
+}

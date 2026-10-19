@@ -1,0 +1,33 @@
+services:
+  app:
+    image: ghcr.io/ernuolien/tldr_linebot:${IMAGE_TAG:-latest}
+    env_file: .env
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 60s
+      timeout: 5s
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      - DOMAIN=${DOMAIN:?set DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    mem_limit: 128m
+    depends_on:
+      - app
+
+volumes:
+  app-data:
+  caddy-data:
+  caddy-config:

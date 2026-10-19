@@ -1,0 +1,8 @@
+[Unit]
+Description=Update DuckDNS record with this VM's public IP
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/tldr_linebot/deploy/duckdns-update.sh
