@@ -26,7 +26,7 @@ LINE 群組聊天摘要機器人。在群組輸入 `tldr` 就會摘要最近的�
 ```
 LINE ──HTTPS──▶ Caddy (DuckDNS + Let's Encrypt) ──▶ FastAPI app ──▶ SQLite
                                                         │
-                                                        └──▶ LLM（Gemini Flash，失敗時改用 Flash-Lite）
+                                                        └──▶ LLM（Gemini Flash → Flash-Lite → NVIDIA，依序備援）
 ```
 
 | 檔案 | 用途 |
@@ -62,7 +62,12 @@ push 到 `main` 且 CI 通過後，GitHub Actions 會 build 映像推到 `ghcr.i
 ### 2. LLM API 金鑰
 
 - 主要：[Google AI Studio](https://aistudio.google.com/apikey) 取得 Gemini API key。免費方案的內容會被 Google 用於改進產品。
-- 備援：預設用同一把金鑰的 Gemini Flash-Lite（Flash 忙碌回 503 時接手）；也可改用 [build.nvidia.com](https://build.nvidia.com) 的模型。
+- 備援：預設用同一把金鑰的 Gemini Flash-Lite（Flash 忙碌回 503 時接手）。
+- 第二備援（選用）：[NVIDIA build.nvidia.com](https://build.nvidia.com) 的免費模型，Gemini 整個掛掉時接手。
+  1. 用 NVIDIA 帳號登入 build.nvidia.com（第一次登入會自動加入 NVIDIA Developer Program，免信用卡；部分新帳號需要手機驗證）。
+  2. 點右上角頭像 → **API Keys** → **Generate API Key**（或在任一模型頁面按 **Get API Key**）。金鑰以 `nvapi-` 開頭，只會顯示一次，請馬上複製。
+  3. 填入 `.env` 的 `LLM_FALLBACK2_API_KEY`。預設模型是 `deepseek-ai/deepseek-v3.2`；想換的話，到模型目錄挑標示 **Free Endpoint** 的模型，把頁面上的模型 ID（`org/model` 格式）填進 `LLM_FALLBACK2_MODEL`。
+  - 免費額度有每分鐘請求數限制，適合當備援，不建議當主要模型。
 - 模型 ID 會隨時間變動，請到各自網站確認後填入 `.env`。
 
 ### 3. DuckDNS

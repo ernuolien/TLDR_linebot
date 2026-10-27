@@ -35,7 +35,7 @@ from linebot.v3.webhooks import (
 
 from tldr_linebot.bot import Bot, IncomingMessage
 from tldr_linebot.config import Settings
-from tldr_linebot.llm import FallbackSummarizer, make_provider
+from tldr_linebot.llm import FallbackSummarizer, Provider, make_provider
 from tldr_linebot.store import Store
 
 logger = logging.getLogger(__name__)
@@ -128,10 +128,8 @@ async def purge_loop(bot: Bot) -> None:
         await asyncio.sleep(PURGE_INTERVAL_SECONDS)
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
-    settings = settings or Settings()  # type: ignore[call-arg]
-    parser = WebhookParser(settings.line_channel_secret)
-
+def build_providers(settings: Settings) -> list[Provider]:
+    """Primary first, then each fallback that has an API key, in the order they are tried."""
     providers = [
         make_provider("primary", settings.llm_base_url, settings.llm_api_key, settings.llm_model)
     ]
@@ -144,6 +142,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 settings.llm_fallback_model,
             )
         )
+    if settings.llm_fallback2_api_key:
+        providers.append(
+            make_provider(
+                "fallback2",
+                settings.llm_fallback2_base_url,
+                settings.llm_fallback2_api_key,
+                settings.llm_fallback2_model,
+            )
+        )
+    return providers
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or Settings()  # type: ignore[call-arg]
+    parser = WebhookParser(settings.line_channel_secret)
+    providers = build_providers(settings)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

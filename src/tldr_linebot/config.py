@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     llm_fallback_api_key: str = ""
     llm_fallback_model: str = "gemini-flash-lite-latest"
 
+    # Second fallback, tried last; a different provider so a Gemini outage is covered too.
+    # Defaults to NVIDIA's free hosted models (https://build.nvidia.com); leave key empty to disable
+    llm_fallback2_base_url: str = "https://integrate.api.nvidia.com/v1"
+    llm_fallback2_api_key: str = ""
+    llm_fallback2_model: str = "deepseek-ai/deepseek-v3.2"
+
     db_path: str = "data/tldr.db"
     timezone: str = "Asia/Taipei"
 

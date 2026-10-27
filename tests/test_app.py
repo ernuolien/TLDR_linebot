@@ -109,3 +109,14 @@ def test_to_incoming_extracts_user_mentions_but_not_the_bot():
     body = json.dumps({"destination": "x", "events": [text]})
     events = parser.parse(body, sign(body))
     assert app_module.to_incoming(events[0]).mentions == ("u2",)
+
+
+def test_build_providers_adds_fallbacks_that_have_keys(settings):
+    assert [p.name for p in app_module.build_providers(settings)] == ["primary"]
+
+    settings.llm_fallback_api_key = "k1"
+    settings.llm_fallback2_api_key = "nvapi-k2"
+    providers = app_module.build_providers(settings)
+    assert [p.name for p in providers] == ["primary", "fallback", "fallback2"]
+    assert providers[2].model == "deepseek-ai/deepseek-v3.2"
+    assert str(providers[2].client.base_url).startswith("https://integrate.api.nvidia.com/v1")
