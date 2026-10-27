@@ -39,6 +39,14 @@ async def test_uses_primary_when_it_works():
     assert f_calls.calls == 0
 
 
+async def test_logs_which_model_answered(caplog):
+    primary, _ = provider("p", "")
+    fallback, _ = provider("f", "summary")
+    with caplog.at_level("INFO", logger="tldr_linebot.llm"):
+        await FallbackSummarizer([primary, fallback]).summarize("s", "u")
+    assert "answered by provider f (model m)" in caplog.text
+
+
 async def test_falls_back_on_rate_limit():
     primary, _ = provider("p", rate_limit())
     fallback, _ = provider("f", "from fallback")

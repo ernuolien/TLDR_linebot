@@ -44,6 +44,7 @@ class FallbackSummarizer:
                 )
                 content = response.choices[0].message.content
                 if content and content.strip():
+                    logger.info("answered by provider %s (model %s)", provider.name, provider.model)
                     return content.strip()
                 logger.warning("provider %s returned empty content", provider.name)
             except openai.APIError as exc:
