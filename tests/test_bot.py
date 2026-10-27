@@ -282,3 +282,29 @@ async def test_person_outside_window_is_unknown(env):
     assert messenger.replies == []  # 小華 hasn't spoken in the last 3 hours
     await bot.on_message(msg("tldr 小華 6h", token="t2"))
     assert messenger.replies[0][1].startswith("小華（最近 6 小時，1 則）")
+
+
+async def test_question_looks_back_over_retention(env):
+    bot, _, messenger, summarizer, _ = env
+    now_ms = int(NOW * 1000)
+    await bot.on_message(msg("媽媽下週一住院，要帶健保卡", ts_ms=now_ms - 5 * 24 * HOUR_MS))
+    await bot.on_message(msg("晚餐吃什麼", user="u2", ts_ms=now_ms - HOUR_MS))
+
+    await bot.on_message(msg("tldr ? 幫我整理住院有關的事情", token="q"))
+
+    assert messenger.replies == [("q", "🔍 幫我整理住院有關的事情（最近 7 天）\n摘要結果")]
+    prompt = summarizer.prompts[0]
+    assert prompt.startswith("<request>\n幫我整理住院有關的事情\n</request>")
+    assert "媽媽下週一住院" in prompt and "晚餐吃什麼" in prompt
+
+
+async def test_question_with_window(env):
+    bot, store, messenger, summarizer, _ = env
+    now_ms = int(NOW * 1000)
+    await bot.on_message(msg("太舊了", ts_ms=now_ms - 3 * 24 * HOUR_MS))
+    await bot.on_message(msg("住院手續", ts_ms=now_ms - HOUR_MS))
+    await bot.on_message(msg("tldr 問 住院 2d"))
+
+    assert messenger.replies[0][1].startswith("🔍 住院（最近 2 天）\n")
+    assert "太舊了" not in summarizer.prompts[0]
+    assert len(store.since("g1", 0, 10)[0]) == 2  # the question itself is not stored

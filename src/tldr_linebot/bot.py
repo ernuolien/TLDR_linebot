@@ -12,6 +12,7 @@ from tldr_linebot.config import Settings
 from tldr_linebot.llm import SummarizeError, Summarizer
 from tldr_linebot.prompt import (
     PERSON_SYSTEM_PROMPT,
+    QUESTION_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
     build_chat_log,
     build_user_prompt,
@@ -119,7 +120,7 @@ class Bot:
             return
         self._last_tldr[msg.chat_id] = now
 
-        text = await self._summarize(msg.chat_id, since_ms, cmd.window, person)
+        text = await self._summarize(msg.chat_id, since_ms, cmd.window, person, cmd.question)
         await self._messenger.reply(msg.reply_token, text[:LINE_TEXT_LIMIT])
 
     async def on_join(self, reply_token: str | None) -> None:
@@ -170,7 +171,12 @@ class Bot:
         return Person(matches[0], speakers[matches[0]])
 
     async def _summarize(
-        self, chat_id: str, since_ms: int, window: timedelta, person: Person | None
+        self,
+        chat_id: str,
+        since_ms: int,
+        window: timedelta,
+        person: Person | None,
+        question: str | None = None,
     ) -> str:
         messages, total = self._store.since(chat_id, since_ms, self._settings.max_messages)
         if not messages:
@@ -186,8 +192,13 @@ class Bot:
             self._settings.max_input_chars,
             highlight=person.user_id if person else None,
         )
-        system = SYSTEM_PROMPT if person is None else PERSON_SYSTEM_PROMPT
-        user = build_user_prompt(chat_log, person.name if person else None)
+        if question is not None:
+            system = QUESTION_SYSTEM_PROMPT
+        elif person is not None:
+            system = PERSON_SYSTEM_PROMPT
+        else:
+            system = SYSTEM_PROMPT
+        user = build_user_prompt(chat_log, person.name if person else None, question)
         try:
             summary = await self._summarizer.summarize(system, user)
         except SummarizeError:
@@ -197,6 +208,8 @@ class Bot:
         if person is not None:
             heading = f"{person.name}（最近 {command.describe_window(window)}，{said} 則）"
             summary = f"{heading}\n{summary}"
+        elif question is not None:
+            summary = f"🔍 {question}（最近 {command.describe_window(window)}）\n{summary}"
         if included < total:
             return f"（訊息過多，僅摘要最近 {included} 則，共 {total} 則）\n\n{summary}"
         return summary

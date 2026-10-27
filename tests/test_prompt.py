@@ -32,3 +32,6 @@ def test_highlights_target_person():
 def test_user_prompt_wraps_chat():
     assert "<chat>\nlog\n</chat>" in build_user_prompt("log")
     assert build_user_prompt("log", "小華").startswith("目標成員：小華")
+    assert build_user_prompt("log", question="住院") == (
+        "<request>\n住院\n</request>\n\n<chat>\nlog\n</chat>"
+    )

@@ -80,3 +80,27 @@ def test_describe_window():
     assert describe_window(timedelta(hours=3)) == "3 小時"
     assert describe_window(timedelta(days=2)) == "2 天"
     assert describe_window(timedelta(hours=48)) == "2 天"
+
+
+@pytest.mark.parametrize(
+    ("text", "question", "window"),
+    [
+        ("tldr ? 幫我整理住院有關的事情", "幫我整理住院有關的事情", MAXIMUM),
+        ("tldr ？住院", "住院", MAXIMUM),
+        ("/tldr ?住院的事 2d", "住院的事", timedelta(days=2)),
+        ("tldr 問 住院要帶什麼 6h", "住院要帶什麼", timedelta(hours=6)),
+        ("tldr ? 3號開會 5", "3號開會 5", MAXIMUM),  # not a duration: part of the question
+        ("tldr ? 2d", "2d", MAXIMUM),  # a lone word is the question, not a duration
+    ],
+)
+def test_question(text, question, window):
+    assert p(text) == TldrCommand(window, question=question)
+
+
+@pytest.mark.parametrize("text", ["tldr ?", "tldr ？  ", "tldr ? 住院 8d"])
+def test_invalid_question(text):
+    assert isinstance(p(text), InvalidCommand)
+
+
+def test_question_keyword_needs_a_space():
+    assert p("tldr 問題") == TldrCommand(DEFAULT, "問題")
